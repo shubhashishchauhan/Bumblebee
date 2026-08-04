@@ -25,11 +25,14 @@
     <button id="prevBtn">← Prev</button>
     <span id="rowLabel"></span>
     <button id="nextBtn">Next →</button>
+    <button id="downloadBtn">Download this letter as PDF</button>
   </div>
   <pre id="mergedOutput" style="white-space:pre-wrap; background:#efe; padding:12px;"></pre>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script>
     const docxInput = document.getElementById('docxInput');
     const output = document.getElementById('output');
@@ -131,6 +134,37 @@
 
     document.getElementById('prevBtn').addEventListener('click', () => showRow(currentRow - 1));
     document.getElementById('nextBtn').addEventListener('click', () => showRow(currentRow + 1));
+
+    async function downloadCurrentAsPdf() {
+      const el = document.getElementById('mergedOutput');
+
+      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/png');
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+
+      const imgWidth = 210;
+      const pageHeight = 297;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save('Row-' + (currentRow + 1) + '.pdf');
+    }
+
+    document.getElementById('downloadBtn').addEventListener('click', downloadCurrentAsPdf);
   </script>
 </body>
 </html>
