@@ -7,5 +7,31 @@
 <body>
   <h1>🐝 Bumblebee</h1>
   <p>Let's automate some letters.</p>
+
+  <input type="file" id="docxInput" accept=".docx">
+  <pre id="output" style"white-space:pre-wrap; background:#f4f4f4; padding:12px;"></pre>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script>
+    const docxInput = document.getElementById('docxInput');
+    const output = document.getElementById('output');
+
+    docxInput.addEventListener('change', () => {
+      const file = docxInput.file[0];
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        const arrayBuffer = e.target.result;
+        mammoth.extractRawText({ arrayBuffer })
+          .then(result => {
+            output.textContent = result.value;
+          });
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+  </script>
+ </body>
+ </html>
 </body>
 </html>
