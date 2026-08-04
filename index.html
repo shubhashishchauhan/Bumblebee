@@ -33,7 +33,7 @@
 
     function extractPlaceholders(text) {
       const found = new Set();
-      const regex = /\{\{\s*([^{}]+?)\s*\}\}/g;
+      const regex = /\{\s*([^{}]+?)\s*\}/g;
       let match;
       while ((match = regex.exec(text))) {
         found.add(match[1].trim());
@@ -50,7 +50,7 @@
         const value = key !== undefined ? String(rowData[key]) : `[[MISSING: ${p}]]`;
 
         const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const pattern = new RegExp('\\{\\{\\s*' + escaped + '\\s*\\}\\}', 'g');
+        const pattern = new RegExp('\\{\\s*' + escaped + '\\s*\\}', 'g');
         merged = merged.replace(pattern, value);
       });
       return merged;
