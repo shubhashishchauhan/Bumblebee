@@ -63,9 +63,12 @@
   .navLabel{font-family:'Source Serif 4', serif; font-size:14px; color:var(--ink-soft);}
 
   .letterPreview{
-    text-align:left; max-width:600px; margin:0 auto; background:#FBF9F4; border:1px solid var(--line);
-    border-radius:8px; padding:30px 36px; font-family:'Source Serif 4', serif; font-size:14px;
-    line-height:1.7; white-space:pre-wrap; max-height:420px; overflow-y:auto;
+    text-align:left; background:#EDEBE4; border:1px solid var(--line);
+    border-radius:8px; padding:24px; max-height:600px; overflow:auto;
+  }
+  .letterPreview .docx-wrapper{background:transparent; padding:0;}
+  .letterPreview .docx{
+    box-shadow:0 4px 14px rgba(0,0,0,.12) !important; margin:0 auto 20px !important;
   }
 
   .downloadArea{text-align:center;}
@@ -127,6 +130,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.1.15/dist/docx-preview.js"></script>
 <script>
   const docxInput = document.getElementById('docxInput');
   const xlsxInput = document.getElementById('xlsxInput');
@@ -203,6 +207,7 @@
         }
       }
       placeholders = findPlaceholders(allText);
+
       tryReveal();
     };
 
@@ -224,37 +229,6 @@
 
     reader.readAsArrayBuffer(file);
   });
-
-  async function previewTextForRow(rowData) {
-    const zip = await JSZip.loadAsync(templateArrayBuffer);
-    const entry = zip.file('word/document.xml');
-    const xml = await entry.async('string');
-    let text = extractVisibleText(xml);
-
-    placeholders.forEach(p => {
-      const key = Object.keys(rowData).find(k => k.trim().toLowerCase() === p.toLowerCase());
-      const value = key !== undefined ? String(rowData[key]) : '[[MISSING: ' + p + ']]';
-      const pattern = new RegExp('\\{\\s*' + escapeRegex(p) + '\\s*\\}', 'g');
-      text = text.replace(pattern, value);
-    });
-
-    return text;
-  }
-
-  async function showPreview(i) {
-    if (rows.length === 0 || !templateArrayBuffer) return;
-    currentRow = Math.max(0, Math.min(rows.length - 1, i));
-    rowLabel.textContent = 'Letter ' + (currentRow + 1) + ' of ' + rows.length;
-
-    const text = await previewTextForRow(rows[currentRow]);
-    letterPreview.textContent = text;
-
-    prevBtn.disabled = currentRow === 0;
-    nextBtn.disabled = currentRow === rows.length - 1;
-  }
-
-  prevBtn.addEventListener('click', () => showPreview(currentRow - 1));
-  nextBtn.addEventListener('click', () => showPreview(currentRow + 1));
 
   async function buildMergedDocxBlob(rowData) {
     const zip = await JSZip.loadAsync(templateArrayBuffer);
@@ -280,6 +254,38 @@
       mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     });
   }
+
+  async function showPreview(i) {
+    if (rows.length === 0 || !templateArrayBuffer) return;
+    currentRow = Math.max(0, Math.min(rows.length - 1, i));
+    rowLabel.textContent = 'Letter ' + (currentRow + 1) + ' of ' + rows.length;
+
+    letterPreview.innerHTML = '<p style="padding:40px; color:#888;">Rendering preview…</p>';
+
+    try {
+      const mergedBlob = await buildMergedDocxBlob(rows[currentRow]);
+      letterPreview.innerHTML = '';
+      await docx.renderAsync(mergedBlob, letterPreview, null, {
+        inWrapper: true,
+        ignoreWidth: false,
+        ignoreHeight: false,
+        renderHeaders: true,
+        renderFooters: true,
+        useBase64URL: true
+      });
+    } catch (err) {
+      letterPreview.innerHTML =
+        '<p style="color:#B3402C; padding:20px;">Could not render preview: ' + err.message +
+        '<br><br>(Your downloaded .docx files are unaffected by this — they\'re built separately and are still exact.)</p>';
+      console.error('docx-preview render error:', err);
+    }
+
+    prevBtn.disabled = currentRow === 0;
+    nextBtn.disabled = currentRow === rows.length - 1;
+  }
+
+  prevBtn.addEventListener('click', () => showPreview(currentRow - 1));
+  nextBtn.addEventListener('click', () => showPreview(currentRow + 1));
 
   genAllBtn.addEventListener('click', async () => {
     genAllBtn.disabled = true;
