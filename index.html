@@ -6,7 +6,7 @@
 </head>
 <body>
   <h1>🐝 Bumblebee</h1>
-  <p>Let's automate some letters.</p>
+  <p>Let's automate some letters — exact original formatting, logo, header and footer preserved.</p>
 
   <input type="file" id="docxInput" accept=".docx">
 
@@ -21,79 +21,84 @@
   <hr>
 
   <div>
-    <button id="prevBtn">← Prev</button>
-    <span id="rowLabel"></span>
-    <button id="nextBtn">Next →</button>
-    <button id="downloadBtn">Download this letter as PDF</button>
-    <button id="genAllBtn">Generate all &amp; download ZIP</button>
+    <button id="genOneBtn">Download row 1 as .docx (test)</button>
+    <button id="genAllBtn">Generate all &amp; download ZIP of .docx files</button>
     <span id="genStatus"></span>
-  </div>
-
-  <div id="mergedOutput"
-       style="background:#fff; border:1px solid #ddd; padding:40px 50px; max-width:700px; font-family:'Times New Roman', serif; line-height:1.6;">
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     const docxInput = document.getElementById('docxInput');
     const placeholderList = document.getElementById('placeholderList');
 
-    let templateHtml = '';
+    let templateArrayBuffer = null;
+    let placeholders = [];
 
-    function extractPlaceholders(html) {
+    const XML_PARTS = [
+      'word/document.xml',
+      'word/header1.xml', 'word/header2.xml', 'word/header3.xml',
+      'word/footer1.xml', 'word/footer2.xml', 'word/footer3.xml'
+    ];
+
+    function extractVisibleText(xmlString) {
+      const doc = new DOMParser().parseFromString(xmlString, 'application/xml');
+      const nodes = doc.getElementsByTagName('w:t');
+      let text = '';
+      for (let i = 0; i < nodes.length; i++) text += nodes[i].textContent;
+      return text;
+    }
+
+    function findPlaceholders(text) {
       const found = new Set();
       const regex = /\{\s*([^{}]+?)\s*\}/g;
       let match;
-      while ((match = regex.exec(html))) {
+      while ((match = regex.exec(text))) {
         found.add(match[1].trim());
       }
       return [...found];
     }
 
-    function mergeRow(templateHtmlStr, rowData, placeholders) {
-      let merged = templateHtmlStr;
-      placeholders.forEach(p => {
-        const key = Object.keys(rowData).find(
-          k => k.trim().toLowerCase() === p.toLowerCase()
-        );
-        const value = key !== undefined
-          ? String(rowData[key])
-          : `<span style="color:red;">[[MISSING: ${p}]]</span>`;
+    function escapeXml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
 
-        const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const pattern = new RegExp('\\{\\s*' + escaped + '\\s*\\}', 'g');
-        merged = merged.replace(pattern, value);
-      });
-      return merged;
+    function escapeRegex(str) {
+      return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     docxInput.addEventListener('change', () => {
       const file = docxInput.files[0];
       const reader = new FileReader();
 
-      reader.onload = (e) => {
-        const arrayBuffer = e.target.result;
-        mammoth.convertToHtml({ arrayBuffer })
-          .then(result => {
-            templateHtml = result.value;
+      reader.onload = async (e) => {
+        templateArrayBuffer = e.target.result;
 
-            const placeholders = extractPlaceholders(templateHtml);
-            placeholderList.innerHTML = '';
-            placeholders.forEach(p => {
-              const li = document.createElement('li');
-              li.textContent = p;
-              placeholderList.appendChild(li);
-            });
+        const zip = await JSZip.loadAsync(templateArrayBuffer);
+        let allText = '';
+        for (const part of XML_PARTS) {
+          const entry = zip.file(part);
+          if (entry) {
+            const xml = await entry.async('string');
+            allText += extractVisibleText(xml) + '\n';
+          }
+        }
 
-            if (rows.length > 0) showRow(currentRow);
-          })
-          .catch(err => {
-            document.getElementById('mergedOutput').textContent = 'Error reading file: ' + err.message;
-          });
+        placeholders = findPlaceholders(allText);
+        placeholderList.innerHTML = '';
+        placeholders.forEach(p => {
+          const li = document.createElement('li');
+          li.textContent = p;
+          placeholderList.appendChild(li);
+        });
+
+        if (placeholders.length === 0) {
+          placeholderList.innerHTML = '<li style="color:red;">No {placeholders} found — check your template.</li>';
+        }
       };
 
       reader.readAsArrayBuffer(file);
@@ -102,7 +107,6 @@
     const xlsxInput = document.getElementById('xlsxInput');
     const rowsOutput = document.getElementById('rowsOutput');
     let rows = [];
-    let currentRow = 0;
 
     xlsxInput.addEventListener('change', () => {
       const file = xlsxInput.files[0];
@@ -115,103 +119,75 @@
         const sheet = workbook.Sheets[sheetName];
 
         rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-
         rowsOutput.textContent = rows.length + ' row(s) found.\n\n' + JSON.stringify(rows, null, 2);
-
-        currentRow = 0;
-        showRow(0);
       };
 
       reader.readAsArrayBuffer(file);
     });
 
-    function showRow(i) {
-      if (rows.length === 0 || !templateHtml) return;
-      currentRow = Math.max(0, Math.min(rows.length - 1, i));
+    async function buildMergedDocxBlob(rowData) {
+      const zip = await JSZip.loadAsync(templateArrayBuffer);
 
-      document.getElementById('rowLabel').textContent =
-        'Row ' + (currentRow + 1) + ' of ' + rows.length;
+      for (const part of XML_PARTS) {
+        const entry = zip.file(part);
+        if (!entry) continue;
 
-      const placeholders = extractPlaceholders(templateHtml);
-      const merged = mergeRow(templateHtml, rows[currentRow], placeholders);
-      document.getElementById('mergedOutput').innerHTML = merged;
+        let xml = await entry.async('string');
 
-      document.getElementById('prevBtn').disabled = currentRow === 0;
-      document.getElementById('nextBtn').disabled = currentRow === rows.length - 1;
-    }
+        placeholders.forEach(p => {
+          const key = Object.keys(rowData).find(
+            k => k.trim().toLowerCase() === p.toLowerCase()
+          );
+          const value = key !== undefined ? escapeXml(String(rowData[key])) : '{' + p + '}';
+          const pattern = new RegExp('\\{\\s*' + escapeRegex(p) + '\\s*\\}', 'g');
+          xml = xml.replace(pattern, value);
+        });
 
-    document.getElementById('prevBtn').addEventListener('click', () => showRow(currentRow - 1));
-    document.getElementById('nextBtn').addEventListener('click', () => showRow(currentRow + 1));
-
-    async function elementToPdfBlob() {
-      const el = document.getElementById('mergedOutput');
-
-      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff' });
-      const imgData = canvas.toDataURL('image/png');
-
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF('p', 'mm', 'a4');
-
-      const imgWidth = 210;
-      const pageHeight = 297;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+        zip.file(part, xml);
       }
 
-      return pdf.output('blob');
+      return await zip.generateAsync({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
     }
 
-    document.getElementById('downloadBtn').addEventListener('click', async () => {
-      const blob = await elementToPdfBlob();
+    document.getElementById('genOneBtn').addEventListener('click', async () => {
+      if (!templateArrayBuffer || rows.length === 0) {
+        alert('Upload both a docx and an Excel file first!');
+        return;
+      }
+      const blob = await buildMergedDocxBlob(rows[0]);
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'Row-' + (currentRow + 1) + '.pdf';
+      a.download = 'Letter-1.docx';
       a.click();
     });
 
-    async function renderRowToPdfBlob(rowData) {
-      const placeholders = extractPlaceholders(templateHtml);
-      document.getElementById('mergedOutput').innerHTML = mergeRow(templateHtml, rowData, placeholders);
-      return await elementToPdfBlob();
-    }
-
     document.getElementById('genAllBtn').addEventListener('click', async () => {
-      if (rows.length === 0 || !templateHtml) {
+      if (!templateArrayBuffer || rows.length === 0) {
         alert('Upload both a docx and an Excel file first!');
         return;
       }
 
       const statusEl = document.getElementById('genStatus');
-      const zip = new JSZip();
+      const outputZip = new JSZip();
 
       for (let i = 0; i < rows.length; i++) {
         statusEl.textContent = 'Generating ' + (i + 1) + ' of ' + rows.length + '...';
-        const blob = await renderRowToPdfBlob(rows[i]);
-        zip.file('Letter-' + (i + 1) + '.pdf', blob);
+        const blob = await buildMergedDocxBlob(rows[i]);
+        outputZip.file('Letter-' + (i + 1) + '.docx', blob);
       }
 
       statusEl.textContent = 'Zipping...';
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const zipBlob = await outputZip.generateAsync({ type: 'blob' });
 
       const a = document.createElement('a');
       a.href = URL.createObjectURL(zipBlob);
       a.download = 'bumblebee-letters.zip';
       a.click();
 
-      statusEl.textContent = 'Done — ' + rows.length + ' PDF(s) zipped.';
-
-      showRow(currentRow);
+      statusEl.textContent = 'Done — ' + rows.length + ' .docx file(s) zipped.';
     });
   </script>
 </body>
