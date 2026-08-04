@@ -9,7 +9,6 @@
   <p>Let's automate some letters.</p>
 
   <input type="file" id="docxInput" accept=".docx">
-  <pre id="output" style="white-space:pre-wrap; background:#f4f4f4; padding:12px;"></pre>
 
   <h3>Detected placeholders:</h3>
   <ul id="placeholderList"></ul>
@@ -26,35 +25,44 @@
     <span id="rowLabel"></span>
     <button id="nextBtn">Next →</button>
     <button id="downloadBtn">Download this letter as PDF</button>
+    <button id="genAllBtn">Generate all &amp; download ZIP</button>
+    <span id="genStatus"></span>
   </div>
-  <pre id="mergedOutput" style="white-space:pre-wrap; background:#efe; padding:12px;"></pre>
+
+  <div id="mergedOutput"
+       style="background:#fff; border:1px solid #ddd; padding:40px 50px; max-width:700px; font-family:'Times New Roman', serif; line-height:1.6;">
+  </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     const docxInput = document.getElementById('docxInput');
-    const output = document.getElementById('output');
     const placeholderList = document.getElementById('placeholderList');
 
-    function extractPlaceholders(text) {
+    let templateHtml = '';
+
+    function extractPlaceholders(html) {
       const found = new Set();
       const regex = /\{\s*([^{}]+?)\s*\}/g;
       let match;
-      while ((match = regex.exec(text))) {
+      while ((match = regex.exec(html))) {
         found.add(match[1].trim());
       }
       return [...found];
     }
 
-    function mergeRow(templateText, rowData, placeholders) {
-      let merged = templateText;
+    function mergeRow(templateHtmlStr, rowData, placeholders) {
+      let merged = templateHtmlStr;
       placeholders.forEach(p => {
         const key = Object.keys(rowData).find(
           k => k.trim().toLowerCase() === p.toLowerCase()
         );
-        const value = key !== undefined ? String(rowData[key]) : `[[MISSING: ${p}]]`;
+        const value = key !== undefined
+          ? String(rowData[key])
+          : `<span style="color:red;">[[MISSING: ${p}]]</span>`;
 
         const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const pattern = new RegExp('\\{\\s*' + escaped + '\\s*\\}', 'g');
@@ -69,11 +77,11 @@
 
       reader.onload = (e) => {
         const arrayBuffer = e.target.result;
-        mammoth.extractRawText({ arrayBuffer })
+        mammoth.convertToHtml({ arrayBuffer })
           .then(result => {
-            output.textContent = result.value;
+            templateHtml = result.value;
 
-            const placeholders = extractPlaceholders(result.value);
+            const placeholders = extractPlaceholders(templateHtml);
             placeholderList.innerHTML = '';
             placeholders.forEach(p => {
               const li = document.createElement('li');
@@ -84,7 +92,7 @@
             if (rows.length > 0) showRow(currentRow);
           })
           .catch(err => {
-            output.textContent = 'Error reading file: ' + err.message;
+            document.getElementById('mergedOutput').textContent = 'Error reading file: ' + err.message;
           });
       };
 
@@ -118,15 +126,15 @@
     });
 
     function showRow(i) {
-      if (rows.length === 0) return;
+      if (rows.length === 0 || !templateHtml) return;
       currentRow = Math.max(0, Math.min(rows.length - 1, i));
 
       document.getElementById('rowLabel').textContent =
         'Row ' + (currentRow + 1) + ' of ' + rows.length;
 
-      const placeholders = extractPlaceholders(output.textContent);
-      const merged = mergeRow(output.textContent, rows[currentRow], placeholders);
-      document.getElementById('mergedOutput').textContent = merged;
+      const placeholders = extractPlaceholders(templateHtml);
+      const merged = mergeRow(templateHtml, rows[currentRow], placeholders);
+      document.getElementById('mergedOutput').innerHTML = merged;
 
       document.getElementById('prevBtn').disabled = currentRow === 0;
       document.getElementById('nextBtn').disabled = currentRow === rows.length - 1;
@@ -135,7 +143,7 @@
     document.getElementById('prevBtn').addEventListener('click', () => showRow(currentRow - 1));
     document.getElementById('nextBtn').addEventListener('click', () => showRow(currentRow + 1));
 
-    async function downloadCurrentAsPdf() {
+    async function elementToPdfBlob() {
       const el = document.getElementById('mergedOutput');
 
       const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff' });
@@ -161,10 +169,50 @@
         heightLeft -= pageHeight;
       }
 
-      pdf.save('Row-' + (currentRow + 1) + '.pdf');
+      return pdf.output('blob');
     }
 
-    document.getElementById('downloadBtn').addEventListener('click', downloadCurrentAsPdf);
+    document.getElementById('downloadBtn').addEventListener('click', async () => {
+      const blob = await elementToPdfBlob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'Row-' + (currentRow + 1) + '.pdf';
+      a.click();
+    });
+
+    async function renderRowToPdfBlob(rowData) {
+      const placeholders = extractPlaceholders(templateHtml);
+      document.getElementById('mergedOutput').innerHTML = mergeRow(templateHtml, rowData, placeholders);
+      return await elementToPdfBlob();
+    }
+
+    document.getElementById('genAllBtn').addEventListener('click', async () => {
+      if (rows.length === 0 || !templateHtml) {
+        alert('Upload both a docx and an Excel file first!');
+        return;
+      }
+
+      const statusEl = document.getElementById('genStatus');
+      const zip = new JSZip();
+
+      for (let i = 0; i < rows.length; i++) {
+        statusEl.textContent = 'Generating ' + (i + 1) + ' of ' + rows.length + '...';
+        const blob = await renderRowToPdfBlob(rows[i]);
+        zip.file('Letter-' + (i + 1) + '.pdf', blob);
+      }
+
+      statusEl.textContent = 'Zipping...';
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(zipBlob);
+      a.download = 'bumblebee-letters.zip';
+      a.click();
+
+      statusEl.textContent = 'Done — ' + rows.length + ' PDF(s) zipped.';
+
+      showRow(currentRow);
+    });
   </script>
 </body>
 </html>
