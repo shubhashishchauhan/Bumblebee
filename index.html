@@ -1,193 +1,312 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Bumblebee</title>
+<meta charset="UTF-8">
+<title>Bumblebee</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#26314A;
+    --ink-soft:#5B6478;
+    --gold:#B9903F;
+    --gold-soft:#F6EFDD;
+    --bg:#F5F3EE;
+    --panel:#FFFFFF;
+    --line:#E5E1D6;
+    --good:#3E7A57;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:40px 20px 80px; background:var(--bg); color:var(--ink);
+    font-family:'Inter', sans-serif;
+  }
+  .wrap{max-width:920px; margin:0 auto;}
+
+  header{text-align:center; margin-bottom:36px;}
+  header .badge{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:52px; height:52px; border-radius:50%; border:2px solid var(--gold);
+    font-size:24px; margin-bottom:12px; transform:rotate(-6deg);
+  }
+  h1{
+    font-family:'Source Serif 4', serif; font-size:32px; margin:0 0 6px; font-weight:700;
+  }
+  header p{margin:0; color:var(--ink-soft); font-size:15px;}
+
+  .uploads{display:flex; gap:20px; flex-wrap:wrap; margin-bottom:28px;}
+  .card{
+    flex:1; min-width:280px; background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; padding:24px; text-align:center;
+  }
+  .card .icon{font-size:26px; margin-bottom:8px;}
+  .card h3{margin:0 0 4px; font-size:15px; font-weight:600;}
+  .card p.hint{margin:0 0 16px; font-size:12.5px; color:var(--ink-soft);}
+  .filebtn{
+    display:inline-block; padding:10px 20px; border-radius:8px; border:1px dashed var(--gold);
+    background:var(--gold-soft); color:var(--ink); font-size:13.5px; font-weight:600; cursor:pointer;
+  }
+  .filebtn:hover{opacity:.85;}
+  input[type=file]{display:none;}
+  .filename{margin-top:10px; font-size:12.5px; color:var(--good); font-weight:600; word-break:break-all;}
+
+  .previewSection{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:28px; text-align:center; margin-bottom:24px; display:none;
+  }
+  .previewSection.show{display:block;}
+  .nav{display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:18px;}
+  .navBtn{
+    background:none; border:1px solid var(--line); border-radius:8px; padding:6px 14px;
+    cursor:pointer; font-size:13px; font-weight:600; color:var(--ink);
+  }
+  .navBtn:disabled{opacity:.35; cursor:not-allowed;}
+  .navLabel{font-family:'Source Serif 4', serif; font-size:14px; color:var(--ink-soft);}
+
+  .letterPreview{
+    text-align:left; max-width:600px; margin:0 auto; background:#FBF9F4; border:1px solid var(--line);
+    border-radius:8px; padding:30px 36px; font-family:'Source Serif 4', serif; font-size:14px;
+    line-height:1.7; white-space:pre-wrap; max-height:420px; overflow-y:auto;
+  }
+
+  .downloadArea{text-align:center;}
+  .primaryBtn{
+    background:var(--ink); color:#fff; border:none; border-radius:10px; padding:14px 32px;
+    font-size:15px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif;
+  }
+  .primaryBtn:hover{opacity:.9;}
+  .primaryBtn:disabled{opacity:.4; cursor:not-allowed;}
+  .status{margin-top:12px; font-size:13px; color:var(--ink-soft);}
+  progress{width:280px; height:8px; margin-top:12px; accent-color:var(--gold);}
+</style>
 </head>
 <body>
-  <h1>🐝 Bumblebee</h1>
-  <p>Let's automate some letters — exact original formatting, logo, header and footer preserved.</p>
+<div class="wrap">
 
-  <input type="file" id="docxInput" accept=".docx">
+  <header>
+    <div class="badge">🐝</div>
+    <h1>Bumblebee</h1>
+    <p>Upload your data and your letter template — get every personalized letter back, exactly as designed.</p>
+  </header>
 
-  <h3>Detected placeholders:</h3>
-  <ul id="placeholderList"></ul>
+  <div class="uploads">
+    <div class="card">
+      <div class="icon">📊</div>
+      <h3>Recipient data</h3>
+      <p class="hint">Excel or CSV — first row should be column headers</p>
+      <label class="filebtn" for="xlsxInput">Choose file</label>
+      <input type="file" id="xlsxInput" accept=".xlsx,.xls,.csv">
+      <div class="filename" id="xlsxName"></div>
+    </div>
 
-  <hr>
-
-  <input type="file" id="xlsxInput" accept=".xlsx,.xls,.csv">
-  <pre id="rowsOutput" style="white-space:pre-wrap; background:#eef; padding:12px;"></pre>
-
-  <hr>
-
-  <div>
-    <button id="genOneBtn">Download row 1 as .docx (test)</button>
-    <button id="genAllBtn">Generate all &amp; download ZIP of .docx files</button>
-    <span id="genStatus"></span>
+    <div class="card">
+      <div class="icon">📄</div>
+      <h3>Letter template</h3>
+      <p class="hint">.docx with placeholders like {Name}</p>
+      <label class="filebtn" for="docxInput">Choose file</label>
+      <input type="file" id="docxInput" accept=".docx">
+      <div class="filename" id="docxName"></div>
+    </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script>
-    const docxInput = document.getElementById('docxInput');
-    const placeholderList = document.getElementById('placeholderList');
+  <div class="previewSection" id="previewSection">
+    <div class="nav">
+      <button class="navBtn" id="prevBtn">← Prev</button>
+      <span class="navLabel" id="rowLabel"></span>
+      <button class="navBtn" id="nextBtn">Next →</button>
+    </div>
+    <div class="letterPreview" id="letterPreview"></div>
+  </div>
 
-    let templateArrayBuffer = null;
-    let placeholders = [];
+  <div class="downloadArea">
+    <button class="primaryBtn" id="genAllBtn" disabled>Download all letters (.docx)</button>
+    <div class="status" id="genStatus"></div>
+    <progress id="genProgress" value="0" max="1" style="display:none;"></progress>
+  </div>
 
-    const XML_PARTS = [
-      'word/document.xml',
-      'word/header1.xml', 'word/header2.xml', 'word/header3.xml',
-      'word/footer1.xml', 'word/footer2.xml', 'word/footer3.xml'
-    ];
+</div>
 
-    function extractVisibleText(xmlString) {
-      const doc = new DOMParser().parseFromString(xmlString, 'application/xml');
-      const nodes = doc.getElementsByTagName('w:t');
-      let text = '';
-      for (let i = 0; i < nodes.length; i++) text += nodes[i].textContent;
-      return text;
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+  const docxInput = document.getElementById('docxInput');
+  const xlsxInput = document.getElementById('xlsxInput');
+  const docxName = document.getElementById('docxName');
+  const xlsxName = document.getElementById('xlsxName');
+  const previewSection = document.getElementById('previewSection');
+  const letterPreview = document.getElementById('letterPreview');
+  const rowLabel = document.getElementById('rowLabel');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const genAllBtn = document.getElementById('genAllBtn');
+  const genStatus = document.getElementById('genStatus');
+  const genProgress = document.getElementById('genProgress');
+
+  let templateArrayBuffer = null;
+  let placeholders = [];
+  let rows = [];
+  let currentRow = 0;
+
+  const XML_PARTS = [
+    'word/document.xml',
+    'word/header1.xml', 'word/header2.xml', 'word/header3.xml',
+    'word/footer1.xml', 'word/footer2.xml', 'word/footer3.xml'
+  ];
+
+  function extractVisibleText(xmlString) {
+    const doc = new DOMParser().parseFromString(xmlString, 'application/xml');
+    const nodes = doc.getElementsByTagName('w:t');
+    let text = '';
+    for (let i = 0; i < nodes.length; i++) text += nodes[i].textContent;
+    return text;
+  }
+
+  function findPlaceholders(text) {
+    const found = new Set();
+    const regex = /\{\s*([^{}]+?)\s*\}/g;
+    let match;
+    while ((match = regex.exec(text))) found.add(match[1].trim());
+    return [...found];
+  }
+
+  function escapeXml(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function tryReveal() {
+    if (templateArrayBuffer && rows.length > 0) {
+      previewSection.classList.add('show');
+      genAllBtn.disabled = false;
+      currentRow = 0;
+      showPreview(0);
     }
+  }
 
-    function findPlaceholders(text) {
-      const found = new Set();
-      const regex = /\{\s*([^{}]+?)\s*\}/g;
-      let match;
-      while ((match = regex.exec(text))) {
-        found.add(match[1].trim());
-      }
-      return [...found];
-    }
+  docxInput.addEventListener('change', () => {
+    const file = docxInput.files[0];
+    docxName.textContent = file.name;
+    const reader = new FileReader();
 
-    function escapeXml(str) {
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-    }
+    reader.onload = async (e) => {
+      templateArrayBuffer = e.target.result;
 
-    function escapeRegex(str) {
-      return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    docxInput.addEventListener('change', () => {
-      const file = docxInput.files[0];
-      const reader = new FileReader();
-
-      reader.onload = async (e) => {
-        templateArrayBuffer = e.target.result;
-
-        const zip = await JSZip.loadAsync(templateArrayBuffer);
-        let allText = '';
-        for (const part of XML_PARTS) {
-          const entry = zip.file(part);
-          if (entry) {
-            const xml = await entry.async('string');
-            allText += extractVisibleText(xml) + '\n';
-          }
-        }
-
-        placeholders = findPlaceholders(allText);
-        placeholderList.innerHTML = '';
-        placeholders.forEach(p => {
-          const li = document.createElement('li');
-          li.textContent = p;
-          placeholderList.appendChild(li);
-        });
-
-        if (placeholders.length === 0) {
-          placeholderList.innerHTML = '<li style="color:red;">No {placeholders} found — check your template.</li>';
-        }
-      };
-
-      reader.readAsArrayBuffer(file);
-    });
-
-    const xlsxInput = document.getElementById('xlsxInput');
-    const rowsOutput = document.getElementById('rowsOutput');
-    let rows = [];
-
-    xlsxInput.addEventListener('change', () => {
-      const file = xlsxInput.files[0];
-      const reader = new FileReader();
-
-      reader.onload = (e) => {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-
-        rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-        rowsOutput.textContent = rows.length + ' row(s) found.\n\n' + JSON.stringify(rows, null, 2);
-      };
-
-      reader.readAsArrayBuffer(file);
-    });
-
-    async function buildMergedDocxBlob(rowData) {
       const zip = await JSZip.loadAsync(templateArrayBuffer);
-
+      let allText = '';
       for (const part of XML_PARTS) {
         const entry = zip.file(part);
-        if (!entry) continue;
-
-        let xml = await entry.async('string');
-
-        placeholders.forEach(p => {
-          const key = Object.keys(rowData).find(
-            k => k.trim().toLowerCase() === p.toLowerCase()
-          );
-          const value = key !== undefined ? escapeXml(String(rowData[key])) : '{' + p + '}';
-          const pattern = new RegExp('\\{\\s*' + escapeRegex(p) + '\\s*\\}', 'g');
-          xml = xml.replace(pattern, value);
-        });
-
-        zip.file(part, xml);
+        if (entry) {
+          const xml = await entry.async('string');
+          allText += extractVisibleText(xml) + '\n';
+        }
       }
+      placeholders = findPlaceholders(allText);
+      tryReveal();
+    };
 
-      return await zip.generateAsync({
-        type: 'blob',
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    reader.readAsArrayBuffer(file);
+  });
+
+  xlsxInput.addEventListener('change', () => {
+    const file = xlsxInput.files[0];
+    xlsxName.textContent = file.name;
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      tryReveal();
+    };
+
+    reader.readAsArrayBuffer(file);
+  });
+
+  async function previewTextForRow(rowData) {
+    const zip = await JSZip.loadAsync(templateArrayBuffer);
+    const entry = zip.file('word/document.xml');
+    const xml = await entry.async('string');
+    let text = extractVisibleText(xml);
+
+    placeholders.forEach(p => {
+      const key = Object.keys(rowData).find(k => k.trim().toLowerCase() === p.toLowerCase());
+      const value = key !== undefined ? String(rowData[key]) : '[[MISSING: ' + p + ']]';
+      const pattern = new RegExp('\\{\\s*' + escapeRegex(p) + '\\s*\\}', 'g');
+      text = text.replace(pattern, value);
+    });
+
+    return text;
+  }
+
+  async function showPreview(i) {
+    if (rows.length === 0 || !templateArrayBuffer) return;
+    currentRow = Math.max(0, Math.min(rows.length - 1, i));
+    rowLabel.textContent = 'Letter ' + (currentRow + 1) + ' of ' + rows.length;
+
+    const text = await previewTextForRow(rows[currentRow]);
+    letterPreview.textContent = text;
+
+    prevBtn.disabled = currentRow === 0;
+    nextBtn.disabled = currentRow === rows.length - 1;
+  }
+
+  prevBtn.addEventListener('click', () => showPreview(currentRow - 1));
+  nextBtn.addEventListener('click', () => showPreview(currentRow + 1));
+
+  async function buildMergedDocxBlob(rowData) {
+    const zip = await JSZip.loadAsync(templateArrayBuffer);
+
+    for (const part of XML_PARTS) {
+      const entry = zip.file(part);
+      if (!entry) continue;
+
+      let xml = await entry.async('string');
+
+      placeholders.forEach(p => {
+        const key = Object.keys(rowData).find(k => k.trim().toLowerCase() === p.toLowerCase());
+        const value = key !== undefined ? escapeXml(String(rowData[key])) : '{' + p + '}';
+        const pattern = new RegExp('\\{\\s*' + escapeRegex(p) + '\\s*\\}', 'g');
+        xml = xml.replace(pattern, value);
       });
+
+      zip.file(part, xml);
     }
 
-    document.getElementById('genOneBtn').addEventListener('click', async () => {
-      if (!templateArrayBuffer || rows.length === 0) {
-        alert('Upload both a docx and an Excel file first!');
-        return;
-      }
-      const blob = await buildMergedDocxBlob(rows[0]);
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'Letter-1.docx';
-      a.click();
+    return await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     });
+  }
 
-    document.getElementById('genAllBtn').addEventListener('click', async () => {
-      if (!templateArrayBuffer || rows.length === 0) {
-        alert('Upload both a docx and an Excel file first!');
-        return;
-      }
+  genAllBtn.addEventListener('click', async () => {
+    genAllBtn.disabled = true;
+    genProgress.style.display = 'inline-block';
+    genProgress.max = rows.length;
+    genProgress.value = 0;
 
-      const statusEl = document.getElementById('genStatus');
-      const outputZip = new JSZip();
+    const outputZip = new JSZip();
 
-      for (let i = 0; i < rows.length; i++) {
-        statusEl.textContent = 'Generating ' + (i + 1) + ' of ' + rows.length + '...';
-        const blob = await buildMergedDocxBlob(rows[i]);
-        outputZip.file('Letter-' + (i + 1) + '.docx', blob);
-      }
+    for (let i = 0; i < rows.length; i++) {
+      genStatus.textContent = 'Generating letter ' + (i + 1) + ' of ' + rows.length + '...';
+      const blob = await buildMergedDocxBlob(rows[i]);
+      outputZip.file('Letter-' + (i + 1) + '.docx', blob);
+      genProgress.value = i + 1;
+    }
 
-      statusEl.textContent = 'Zipping...';
-      const zipBlob = await outputZip.generateAsync({ type: 'blob' });
+    genStatus.textContent = 'Zipping...';
+    const zipBlob = await outputZip.generateAsync({ type: 'blob' });
 
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(zipBlob);
-      a.download = 'bumblebee-letters.zip';
-      a.click();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(zipBlob);
+    a.download = 'bumblebee-letters.zip';
+    a.click();
 
-      statusEl.textContent = 'Done — ' + rows.length + ' .docx file(s) zipped.';
-    });
-  </script>
+    genStatus.textContent = 'Done — ' + rows.length + ' letter(s) ready.';
+    genAllBtn.disabled = false;
+  });
+</script>
 </body>
 </html>
