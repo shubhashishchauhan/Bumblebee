@@ -18,7 +18,7 @@
   <script>
     const docxInput = document.getElementById('docxInput');
     const output = document.getElementById('output');
-    const placeholderList = document.getElementById('placeholderlist');
+    const placeholderList = document.getElementById('placeholderList');
 
     function extractPlaceholders (text) {
       const found = new Set();
@@ -53,7 +53,7 @@
           });
       };
 
-      rader.readAsArrayBuffer(file);
+      reader.readAsArrayBuffer(file);
     });      
   </script>
  </body>
