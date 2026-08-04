@@ -25,7 +25,9 @@
         mammoth.extractRawText({ arrayBuffer })
           .then(result => {
             output.textContent = result.value;
-          });
+          })
+          .catch(err => {
+            output.textContent = 'Error reading file: ' + err.message;
       };
 
       reader.readAsArrayBuffer(file);
