@@ -9,7 +9,7 @@
   <p>Let's automate some letters.</p>
 
   <input type="file" id="docxInput" accept=".docx">
-  <pre id="output" style"white-space:pre-wrap; background:#f4f4f4; padding:12px;"></pre>
+  <pre id="output" style="white-space:pre-wrap; background:#f4f4f4; padding:12px;"></pre>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script>
@@ -17,7 +17,7 @@
     const output = document.getElementById('output');
 
     docxInput.addEventListener('change', () => {
-      const file = docxInput.file[0];
+      const file = docxInput.files[0];
       const reader = new FileReader();
 
       reader.onload = (e) => {
@@ -36,5 +36,3 @@
   </script>
  </body>
  </html>
-</body>
-</html>
