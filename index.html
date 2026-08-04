@@ -11,12 +11,26 @@
   <input type="file" id="docxInput" accept=".docx">
   <pre id="output" style="white-space:pre-wrap; background:#f4f4f4; padding:12px;"></pre>
 
+  <h3>Detected placeholders:</h3>
+  <ul id="placeholderList"></ul>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script>
     const docxInput = document.getElementById('docxInput');
     const output = document.getElementById('output');
+    const placeholderList = document.getElementById('placeholderlist');
 
-    docxInput.addEventListener('change', () => {
+    function extractPlaceholders (text) {
+      const found = new Set();
+      const regex = /\{\{\s*([^{}]+?)\s*\}\}/g;
+      let match;
+      while ((match = regex.exec(text))) {
+        found.add(match[1].trim());
+      }
+      return [...found];
+    }
+
+    docxInput.addEventListener('change',() => {
       const file = docxInput.files[0];
       const reader = new FileReader();
 
@@ -25,14 +39,22 @@
         mammoth.extractRawText({ arrayBuffer })
           .then(result => {
             output.textContent = result.value;
+
+            const placeholders = extractPlaceholders(result.value);
+            placeholderList.innerHTML = '';
+            placeholders.forEach(p => {
+              const li = document.createElement('li')
+              li.textContent = p;
+              placeholderList.appendChild(li);
+            });
           })
           .catch(err => {
             output.textContent = 'Error reading file: ' + err.message;
           });
       };
 
-      reader.readAsArrayBuffer(file);
-    });
+      rader.readAsArrayBuffer(file);
+    });      
   </script>
  </body>
  </html>
