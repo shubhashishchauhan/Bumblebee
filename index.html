@@ -6,7 +6,7 @@
 </head>
 <body>
   <h1>🐝 Bumblebee</h1>
-  <p>Let's automate some letters — exact original formatting, logo, header and footer preserved.</p>
+  <p>Let's automate some letters.</p>
 
   <input type="file" id="docxInput" accept=".docx">
 
@@ -20,15 +20,27 @@
 
   <hr>
 
+  <h3>Option A — Exact formatting (recommended)</h3>
   <div>
-    <button id="genOneBtn">Download row 1 as .docx (test)</button>
-    <button id="genAllBtn">Generate all &amp; download ZIP of .docx files</button>
-    <span id="genStatus"></span>
+    <button id="genOneDocxBtn">Download row 1 as .docx (exact)</button>
+    <button id="genAllDocxBtn">Generate all &amp; download ZIP of .docx files</button>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <h3>Option B — PDF (best-effort, may drift slightly from the original)</h3>
+  <div>
+    <button id="genOnePdfBtn">Download row 1 as .pdf (best-effort)</button>
+    <button id="genAllPdfBtn">Generate all &amp; download ZIP of PDFs (best-effort)</button>
+  </div>
+
+  <p id="genStatus"></p>
+
+  <div id="pdfRenderTarget" style="position:fixed; left:-9999px; top:0; width:800px; background:#fff;"></div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.1.15/dist/docx-preview.js"></script>
   <script>
     const docxInput = document.getElementById('docxInput');
     const placeholderList = document.getElementById('placeholderList');
@@ -152,43 +164,5 @@
       });
     }
 
-    document.getElementById('genOneBtn').addEventListener('click', async () => {
+    function checkReady() {
       if (!templateArrayBuffer || rows.length === 0) {
-        alert('Upload both a docx and an Excel file first!');
-        return;
-      }
-      const blob = await buildMergedDocxBlob(rows[0]);
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'Letter-1.docx';
-      a.click();
-    });
-
-    document.getElementById('genAllBtn').addEventListener('click', async () => {
-      if (!templateArrayBuffer || rows.length === 0) {
-        alert('Upload both a docx and an Excel file first!');
-        return;
-      }
-
-      const statusEl = document.getElementById('genStatus');
-      const outputZip = new JSZip();
-
-      for (let i = 0; i < rows.length; i++) {
-        statusEl.textContent = 'Generating ' + (i + 1) + ' of ' + rows.length + '...';
-        const blob = await buildMergedDocxBlob(rows[i]);
-        outputZip.file('Letter-' + (i + 1) + '.docx', blob);
-      }
-
-      statusEl.textContent = 'Zipping...';
-      const zipBlob = await outputZip.generateAsync({ type: 'blob' });
-
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(zipBlob);
-      a.download = 'bumblebee-letters.zip';
-      a.click();
-
-      statusEl.textContent = 'Done — ' + rows.length + ' .docx file(s) zipped.';
-    });
-  </script>
-</body>
-</html>
