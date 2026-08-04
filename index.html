@@ -21,7 +21,11 @@
 
   <hr>
 
-  <button id="mergeBtn">Merge first row</button>
+  <div>
+    <button id="prevBtn">← Prev</button>
+    <span id="rowLabel"></span>
+    <button id="nextBtn">Next →</button>
+  </div>
   <pre id="mergedOutput" style="white-space:pre-wrap; background:#efe; padding:12px;"></pre>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -73,6 +77,8 @@
               li.textContent = p;
               placeholderList.appendChild(li);
             });
+
+            if (rows.length > 0) showRow(currentRow);
           })
           .catch(err => {
             output.textContent = 'Error reading file: ' + err.message;
@@ -85,6 +91,7 @@
     const xlsxInput = document.getElementById('xlsxInput');
     const rowsOutput = document.getElementById('rowsOutput');
     let rows = [];
+    let currentRow = 0;
 
     xlsxInput.addEventListener('change', () => {
       const file = xlsxInput.files[0];
@@ -99,20 +106,31 @@
         rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
         rowsOutput.textContent = rows.length + ' row(s) found.\n\n' + JSON.stringify(rows, null, 2);
+
+        currentRow = 0;
+        showRow(0);
       };
 
       reader.readAsArrayBuffer(file);
     });
 
-    document.getElementById('mergeBtn').addEventListener('click', () => {
-      if (rows.length === 0) {
-        alert('Upload an Excel file first!');
-        return;
-      }
+    function showRow(i) {
+      if (rows.length === 0) return;
+      currentRow = Math.max(0, Math.min(rows.length - 1, i));
+
+      document.getElementById('rowLabel').textContent =
+        'Row ' + (currentRow + 1) + ' of ' + rows.length;
+
       const placeholders = extractPlaceholders(output.textContent);
-      const merged = mergeRow(output.textContent, rows[0], placeholders);
+      const merged = mergeRow(output.textContent, rows[currentRow], placeholders);
       document.getElementById('mergedOutput').textContent = merged;
-    });
+
+      document.getElementById('prevBtn').disabled = currentRow === 0;
+      document.getElementById('nextBtn').disabled = currentRow === rows.length - 1;
+    }
+
+    document.getElementById('prevBtn').addEventListener('click', () => showRow(currentRow - 1));
+    document.getElementById('nextBtn').addEventListener('click', () => showRow(currentRow + 1));
   </script>
 </body>
 </html>
