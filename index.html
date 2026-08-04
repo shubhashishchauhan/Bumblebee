@@ -6,7 +6,7 @@
 </head>
 <body>
   <h1>🐝 Bumblebee</h1>
-  <p>Let's automate some letters.</p>
+  <p>Let's automate some letters — exact original formatting, logo, header and footer preserved.</p>
 
   <input type="file" id="docxInput" accept=".docx">
 
@@ -20,27 +20,14 @@
 
   <hr>
 
-  <h3>Option A — Exact formatting (recommended)</h3>
   <div>
-    <button id="genOneDocxBtn">Download row 1 as .docx (exact)</button>
-    <button id="genAllDocxBtn">Generate all &amp; download ZIP of .docx files</button>
+    <button id="genOneBtn">Download row 1 as .docx (test)</button>
+    <button id="genAllBtn">Generate all &amp; download ZIP of .docx files</button>
+    <span id="genStatus"></span>
   </div>
-
-  <h3>Option B — PDF (best-effort, may drift slightly from the original)</h3>
-  <div>
-    <button id="genOnePdfBtn">Download row 1 as .pdf (best-effort)</button>
-    <button id="genAllPdfBtn">Generate all &amp; download ZIP of PDFs (best-effort)</button>
-  </div>
-
-  <p id="genStatus"></p>
-
-  <div id="pdfRenderTarget" style="position:fixed; left:-9999px; top:0; width:800px; background:#fff;"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.1.15/dist/docx-preview.js"></script>
   <script>
     const docxInput = document.getElementById('docxInput');
     const placeholderList = document.getElementById('placeholderList');
@@ -110,59 +97,3 @@
 
         if (placeholders.length === 0) {
           placeholderList.innerHTML = '<li style="color:red;">No {placeholders} found — check your template.</li>';
-        }
-      };
-
-      reader.readAsArrayBuffer(file);
-    });
-
-    const xlsxInput = document.getElementById('xlsxInput');
-    const rowsOutput = document.getElementById('rowsOutput');
-    let rows = [];
-
-    xlsxInput.addEventListener('change', () => {
-      const file = xlsxInput.files[0];
-      const reader = new FileReader();
-
-      reader.onload = (e) => {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-
-        rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-        rowsOutput.textContent = rows.length + ' row(s) found.\n\n' + JSON.stringify(rows, null, 2);
-      };
-
-      reader.readAsArrayBuffer(file);
-    });
-
-    async function buildMergedDocxBlob(rowData) {
-      const zip = await JSZip.loadAsync(templateArrayBuffer);
-
-      for (const part of XML_PARTS) {
-        const entry = zip.file(part);
-        if (!entry) continue;
-
-        let xml = await entry.async('string');
-
-        placeholders.forEach(p => {
-          const key = Object.keys(rowData).find(
-            k => k.trim().toLowerCase() === p.toLowerCase()
-          );
-          const value = key !== undefined ? escapeXml(String(rowData[key])) : '{' + p + '}';
-          const pattern = new RegExp('\\{\\s*' + escapeRegex(p) + '\\s*\\}', 'g');
-          xml = xml.replace(pattern, value);
-        });
-
-        zip.file(part, xml);
-      }
-
-      return await zip.generateAsync({
-        type: 'blob',
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      });
-    }
-
-    function checkReady() {
-      if (!templateArrayBuffer || rows.length === 0) {
