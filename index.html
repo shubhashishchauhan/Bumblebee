@@ -97,3 +97,97 @@
 
         if (placeholders.length === 0) {
           placeholderList.innerHTML = '<li style="color:red;">No {placeholders} found — check your template.</li>';
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+
+    const xlsxInput = document.getElementById('xlsxInput');
+    const rowsOutput = document.getElementById('rowsOutput');
+    let rows = [];
+
+    xlsxInput.addEventListener('change', () => {
+      const file = xlsxInput.files[0];
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+
+        rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        rowsOutput.textContent = rows.length + ' row(s) found.\n\n' + JSON.stringify(rows, null, 2);
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+
+    async function buildMergedDocxBlob(rowData) {
+      const zip = await JSZip.loadAsync(templateArrayBuffer);
+
+      for (const part of XML_PARTS) {
+        const entry = zip.file(part);
+        if (!entry) continue;
+
+        let xml = await entry.async('string');
+
+        placeholders.forEach(p => {
+          const key = Object.keys(rowData).find(
+            k => k.trim().toLowerCase() === p.toLowerCase()
+          );
+          const value = key !== undefined ? escapeXml(String(rowData[key])) : '{' + p + '}';
+          const pattern = new RegExp('\\{\\s*' + escapeRegex(p) + '\\s*\\}', 'g');
+          xml = xml.replace(pattern, value);
+        });
+
+        zip.file(part, xml);
+      }
+
+      return await zip.generateAsync({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+    }
+
+    document.getElementById('genOneBtn').addEventListener('click', async () => {
+      if (!templateArrayBuffer || rows.length === 0) {
+        alert('Upload both a docx and an Excel file first!');
+        return;
+      }
+      const blob = await buildMergedDocxBlob(rows[0]);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'Letter-1.docx';
+      a.click();
+    });
+
+    document.getElementById('genAllBtn').addEventListener('click', async () => {
+      if (!templateArrayBuffer || rows.length === 0) {
+        alert('Upload both a docx and an Excel file first!');
+        return;
+      }
+
+      const statusEl = document.getElementById('genStatus');
+      const outputZip = new JSZip();
+
+      for (let i = 0; i < rows.length; i++) {
+        statusEl.textContent = 'Generating ' + (i + 1) + ' of ' + rows.length + '...';
+        const blob = await buildMergedDocxBlob(rows[i]);
+        outputZip.file('Letter-' + (i + 1) + '.docx', blob);
+      }
+
+      statusEl.textContent = 'Zipping...';
+      const zipBlob = await outputZip.generateAsync({ type: 'blob' });
+
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(zipBlob);
+      a.download = 'bumblebee-letters.zip';
+      a.click();
+
+      statusEl.textContent = 'Done — ' + rows.length + ' .docx file(s) zipped.';
+    });
+  </script>
+</body>
+</html>
