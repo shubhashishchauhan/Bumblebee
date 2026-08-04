@@ -22,7 +22,7 @@
 
     function extractPlaceholders (text) {
       const found = new Set();
-      const regex = /\{\{\s*([^{}]+?)\s*\}\}/g;
+      const regex = /\{\s*([^{}]+?)\s*\}/g;
       let match;
       while ((match = regex.exec(text))) {
         found.add(match[1].trim());
