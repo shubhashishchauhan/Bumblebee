@@ -180,6 +180,31 @@
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
+  // Builds a filename like "EMP0390998_INIYAVAN.docx" from the row's ID/Name columns.
+  // Tries a few common column-name variants (case-insensitive), falls back to "Letter-N" if not found.
+  function findColumn(rowData, candidates) {
+    const keys = Object.keys(rowData);
+    for (const candidate of candidates) {
+      const key = keys.find(k => k.trim().toLowerCase() === candidate.toLowerCase());
+      if (key !== undefined && String(rowData[key]).trim() !== '') return String(rowData[key]).trim();
+    }
+    return null;
+  }
+
+  function sanitizeForFilename(str) {
+    return str.replace(/[\\/:*?"<>|]/g, '').trim();
+  }
+
+  function buildFileName(rowData, index) {
+    const empId = findColumn(rowData, ['Emp ID', 'Emp Code', 'Employee ID', 'Employee Code']);
+    const empName = findColumn(rowData, ['Emp Name', 'Employee Name', 'Name']);
+
+    if (empId && empName) {
+      return sanitizeForFilename(empId) + '_' + sanitizeForFilename(empName) + '.docx';
+    }
+    return 'Letter-' + (index + 1) + '.docx';
+  }
+
   function tryReveal() {
     if (templateArrayBuffer && rows.length > 0) {
       previewSection.classList.add('show');
@@ -294,11 +319,21 @@
     genProgress.value = 0;
 
     const outputZip = new JSZip();
+    const usedNames = {};
 
     for (let i = 0; i < rows.length; i++) {
       genStatus.textContent = 'Generating letter ' + (i + 1) + ' of ' + rows.length + '...';
       const blob = await buildMergedDocxBlob(rows[i]);
-      outputZip.file('Letter-' + (i + 1) + '.docx', blob);
+
+      let name = buildFileName(rows[i], i);
+      if (usedNames[name] !== undefined) {
+        usedNames[name]++;
+        name = name.replace(/\.docx$/, '') + ' (' + usedNames[name] + ').docx';
+      } else {
+        usedNames[name] = 0;
+      }
+
+      outputZip.file(name, blob);
       genProgress.value = i + 1;
     }
 
